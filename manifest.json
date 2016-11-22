@@ -2,8 +2,9 @@
   "name": "Fake News Alert",
   "version": "0.1.2",
   "manifest_version": 2,
+  "minimum_chrome_version": "22.0.0.0",
   "description": "Alerts you if you are viewing a fake news site",
-  "homepage_url": "http://nymag.com",
+  "homepage_url": "http://nymag.com/",
   "author": "Brian Feldman",
   "browser_action": {
     "default_icon": {
@@ -27,8 +28,8 @@
             "*://*.70news.wordpress.com/*",
             "*://*.abcnews.com.co/*",
             "*://*.activistpost.com/*",
-            "*://*.addictinginfo.org//*",
-            "*://*.americannewsx.com//*",
+            "*://*.addictinginfo.org/*",
+            "*://*.americannewsx.com/*",
             "*://*.samericannews.com/*",
             "*://*.anonews.co/*",
             "*://*.associatedmediacoverage.com/*",
@@ -72,8 +73,8 @@
             "*://*.fprnradio.com/*",
             "*://*.thefreethoughtproject.com/*",
             "*://*.geoengineeringwatch.org/*",
-            "*://*.govtslaves.info/",
-            "*://*.gulagbound.com/",
+            "*://*.govtslaves.info/*",
+            "*://*.gulagbound.com/*",
             "*://*.hangthebankers.com/*",
             "*://*.humansarefree.com/*",
             "*://*.huzlers.com/*",
@@ -149,6 +150,10 @@
             "*://*.zerohedge.com/*"
       ],
       "js": ["alert.js"]
+    },
+    {
+      "matches": ["*://*.facebook.com/*"],
+      "js": ["facebook.js"]
     }
   ]
 }
