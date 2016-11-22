@@ -1,71 +1,112 @@
 // facebook.js
 
-const normalize = (domain) => domain.toLowerCase().replace(/^www\./, '');
+const warning = 'SITE OFTEN FALSE OR MISLEADING';
+const classMark = 'fake-news-checked';
 
-const isMatch = (domain) => {
-  if (!isMatch.domains) {
-    const manifest = chrome.runtime.getManifest();
-    isMatch.domains = manifest.content_scripts[0].matches.map(s =>
-      normalize(s.replace(/^\*:\/\/(?:\*\.)?([^/]*).*/, '$1'))
-    );
-  }
-  return isMatch.domains.indexOf(domain) !== -1;
+const $$ = (selector) => document.querySelectorAll(selector);
+
+// Some (typically sponsored?) content goes through a redirector link shim:
+const linkShimRe = /^https?:\/\/(?:[^.\/]+\.)*facebook\.com\/l\.php\?u=([^&]+)/;
+const getTargetURL = (url) => {
+  const [x, escaped] = linkShimRe.exec(url) || [];
+  return escaped ? decodeURIComponent(escaped) : url;
 };
 
-const flag = (div) => {
-  div.classList.add('fake-news-checked'); // only check each link once
-
-  let domain = div.firstChild.nodeValue;
-  if (!domain) { // also handle <span class="highlightNode">domain</span>:
-    domain = div.firstElementChild.firstChild.nodeValue;
+// return the closest ancestor matching the selector, or undefined, if not found
+matchingAncestor = (selector, node) => {
+  while ((node = node.parentNode) && node.matches) {
+    if (node.matches(selector)) {
+      return node;
+    }
   }
-  if (!isMatch(normalize(domain))) {
-    // console.info(`skipped ${domain}`);
-    return;
+};
+
+const flagLink = (a, matched, url) => {
+  const parent = matchingAncestor('div._ohe', a);
+  if (matched) {
+    a.title = warning;
+    if (parent && !parent.matches(`.${classMark}`)) {
+      parent.appendChild(banner(warning));
+      // console.info(`flagged ${matched}`);
+    }
+  } else {
+    // console.info(`skipped ${url}`);
   }
-  // console.info(`flagged ${domain}`);
+  if (parent) {
+    // on subsequent DOM scans, skip past this story, without even checking
+    parent.classList.add(classMark);
+  }
+};
 
-  const root = div.parentNode.parentNode.parentNode.parentNode;
-
+const banner = (message) => {
   const stripes = document.createElement('div');
   stripes.style.cssText = `
-    position: absolute;
     height: 28px;
-    bottom: 0px;
-    right: 0;
-    left: 0;
-    pointer-events: none;
+    text-align: center;
     background: repeating-linear-gradient(
       -45deg, #000, #000 20px, #df0 20px, #df0 40px
     );
   `;
 
   const warn = document.createElement('div');
-  warn.textContent = 'SITE OFTEN FALSE OR MISLEADING';
+  warn.textContent = message;
   warn.style.cssText = `
-    right: 8px;
-    bottom: 8px;
-    text-align: right;
-    position: absolute;
-    font-size: 11px;
-    color: red;
-    text-shadow:
-      -1px -1px 0 #000,
-      -1px  0   0 #000,
-      -1px  1px 0 #000,
-       0   -1px 0 #000,
-       0    1px 0 #000,
-       1px -1px 0 #000,
-       1px  0   0 #000,
-       1px  1px 0 #000;
+    margin: auto;
+    padding: 0 4px;
+    font-size: 14px;
+    line-height: 28px;
+    font-family: 'Lucida Console', Monaco, monospace;
+    display: inline-block;
+    background: #000;
+    color: #fff;
   `;
   stripes.appendChild(warn);
 
-  root.insertBefore(stripes, root.firstChild);
+  return stripes;
 };
 
-flagNew = () => {
-  document.querySelectorAll('._6lz._6mb:not(.fake-news-checked)').forEach(flag);
+const checkLink = (a) => {
+  if (!checkLink.regexp) {
+    const manifest = chrome.runtime.getManifest();
+    checkLink.regexp = makeRegexp(manifest.content_scripts[0].matches);
+  }
+
+  // multiple links may exist within one single story
+  const url = getTargetURL(a.href);
+  const [matched] = url && checkLink.regexp.exec(url) || [];
+  flagLink(a, matched, url);
+};
+
+const flagNew = () => {
+  $$('div._ohe:not(.fake-news-checked) a[href]:not(.img)').forEach(checkLink);
+};
+
+const quoteRegexp = (s) =>
+  s.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
+
+const makeHostRegexpString = (hostGlob) =>
+  hostGlob.split('*.').map(quoteRegexp).join('(?:[^./]*\\.)*') + '/';
+
+const makePathRegexpString = (hostGlob, pathGlob) =>
+  [ makeHostRegexpString(hostGlob)
+  , pathGlob.split('*').map(quoteRegexp).join('.*').replace(/\.\*$/, '')
+  ].join('')
+
+// make a RegExp, given the extension's matchPatterns
+const makeRegexp = (matchPatterns) => {
+  const urlParts = new RegExp(`^[*]://([^/]*)/(.*)`);
+  const parts = [];
+  for (const pattern of matchPatterns) {
+    const [x, host, path] = urlParts.exec(pattern) || [];
+    if (host) {
+      switch (path) {
+        case '*': parts.push(makeHostRegexpString(host)); break;
+        case '':  parts.push(makeHostRegexpString(host) + '$'); break;
+        default:  parts.push(makePathRegexpString(host, path)); break;
+      }
+    }
+  }
+  return new RegExp(`^[^:]*://(?:${parts.join('|')})`, 'i');
 };
 
 // initial page sweep
